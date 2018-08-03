@@ -1,10 +1,15 @@
 import { delay } from 'redux-saga'
-import { call, put, take } from 'redux-saga/effects'
+import { call, put, take, race } from 'redux-saga/effects'
 import {
   COMPLETE_TODO,
+  DELETE_TODO,
+  DELETE_TODO_REQUEST,
   SHOW_UNICORN,
   HIDE_UNICORN,
+  CONFIRM_NO,
+  CONFIRM_YES,
 } from '../constants/ActionTypes'
+import { openPrompt, clearPrompt } from '../actions'
 
 function* unicornSaga() {
   let completedTasks = 0
@@ -21,4 +26,28 @@ function* unicornSaga() {
   }
 }
 
-export { unicornSaga }
+function* confirmSaga(showAction, hideAction) {
+  yield put(showAction())
+  const { confirmed } = yield race({
+    canceled: take(CONFIRM_NO),
+    confirmed: take(CONFIRM_YES),
+  })
+  yield put(hideAction())
+  return !!confirmed
+}
+
+function* deleteTodoSaga() {
+  while (true) {
+    const action = yield take(DELETE_TODO_REQUEST)
+    const confirmed = yield call(confirmSaga, openPrompt, clearPrompt)
+    if (!confirmed) {
+      continue
+    }
+    yield put({
+      type: DELETE_TODO,
+      id: action.id,
+    })
+  }
+}
+
+export { unicornSaga, deleteTodoSaga }
